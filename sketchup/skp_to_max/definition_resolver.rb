@@ -24,9 +24,11 @@ module SkpToMax
       # Classifies every entity in the checked set according to the 8-case
       # policy table and returns one ResolvedEntry per entity placement.
       #
-      # For shared definitions, ALL instance placements are included in the
-      # result (not only the checked ones) so downstream code sees every SM_
-      # slot without a second model walk.
+      # Returns entries for ALL instances of every shared definition
+      # encountered — not only checked ones. Callers must filter by
+      # checking entity.persistent_id against BoundaryStore (e.g.
+      # BoundaryStore.checked?(entry.entity) == true) to distinguish
+      # confirmed placements from pass-through siblings (case 5).
       #
       # entities - Array<Sketchup::Entity> from BoundaryStore.all_checked()
       # model    - Sketchup::Model (currently unused; reserved for future
@@ -131,7 +133,9 @@ module SkpToMax
       end
 
       # Stable merge key for shared definitions.
-      # Format: "<def_name>__<sorted_child_paths>"
+      # Format: "<def_persistent_id>__<sorted_child_paths>"
+      # Uses persistent_id (not defn.name) as prefix to prevent collision
+      # between distinct definitions that happen to share the same display name.
       # Identical across all instances with the same definition + checked sub-structure,
       # so two resolve() calls on the same model always produce the same key.
       def merge_key_for_shared(defn)
@@ -140,7 +144,7 @@ module SkpToMax
           .map { |e| (BoundaryStore.get_path(e) || [e.persistent_id]).join('/') }
           .sort
           .join(',')
-        "#{defn.name}__#{child_part}"
+        "#{defn.persistent_id}__#{child_part}"
       end
 
       # Depth of a specific entity placement in the model hierarchy.
